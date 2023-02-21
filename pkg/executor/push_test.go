@@ -252,6 +252,51 @@ func TestImageNameTagDigestFile(t *testing.T) {
 	testutil.CheckErrorAndDeepEqual(t, false, err, want, got)
 }
 
+func TestTarPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	f := filepath.Join(tmpDir, "tmpFile.tar")
+
+	image, err := random.Image(1024, 4)
+	if err != nil {
+		t.Fatalf("could not create image: %s", err)
+	}
+
+	digest, err := image.Digest()
+	if err != nil {
+		t.Fatalf("could not get image digest: %s", err)
+	}
+
+	want, err := image.Manifest()
+	if err != nil {
+		t.Fatalf("could not get image manifest: %s", err)
+	}
+
+	opts := config.KanikoOptions{
+		NoPush:  true,
+		TarPath: f,
+	}
+
+	defer os.Remove(f)
+
+	if err := DoPush(image, &opts); err != nil {
+		t.Fatalf("could not push image: %s", err)
+	}
+
+	layoutIndex, err := layout.ImageIndexFromPath(tmpDir)
+	if err != nil {
+		t.Fatalf("could not get index from layout: %s", err)
+	}
+	testutil.CheckError(t, false, validate.Index(layoutIndex))
+
+	layoutImage, err := layoutIndex.Image(digest)
+	if err != nil {
+		t.Fatalf("could not get image from layout: %s", err)
+	}
+
+	got, err := layoutImage.Manifest()
+	testutil.CheckErrorAndDeepEqual(t, false, err, want, got)
+}
+
 var checkPushPermsCallCount = 0
 
 func resetCalledCount() {
